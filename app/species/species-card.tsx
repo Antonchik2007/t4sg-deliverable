@@ -13,25 +13,27 @@ can cause errors with matching props and state in child components if the list o
 import type { Database } from "@/lib/schema";
 import Image from "next/image";
 import SpeciesDetailsDialog from "./species-details-dialog";
+import { useState } from "react";
 type Species = Database["public"]["Tables"]["species"]["Row"];
 
 
 export default function SpeciesCard({ species, userId }: { species: Species, userId: string }) {
 
-  species.author
+  //utilize local copy of species for instant update on front-end
+  const [localSpecies, setLocalSpecies] = useState(species);
 
   return (
     <div className="m-4 w-72 min-w-72 flex-none rounded border-2 p-3 shadow">
-      {species.image && (
+      {localSpecies.image && (
         <div className="relative h-40 w-full">
-          <Image src={species.image} alt={species.scientific_name} fill style={{ objectFit: "cover" }} />
+          <Image src={localSpecies.image} alt={localSpecies.scientific_name} fill style={{ objectFit: "cover" }} />
         </div>
       )}
-      <h3 className="mt-3 text-2xl font-semibold">{species.scientific_name}</h3>
-      <h4 className="text-lg font-light italic">{species.common_name}</h4>
-      <p>{species.description ? species.description.slice(0, 150).trim() + "..." : ""}</p>
+      <h3 className="mt-3 text-2xl font-semibold">{localSpecies.scientific_name}</h3>
+      <h4 className="text-lg font-light italic">{localSpecies.common_name}</h4>
+      <p>{localSpecies.description ? localSpecies.description.slice(0, 150).trim() + "..." : ""}</p>
       {/* Replace the button with the detailed view dialog. */}
-      <SpeciesDetailsDialog species={species} userId={userId}/>
+      <SpeciesDetailsDialog localSpecies={localSpecies} setLocalSpecies={setLocalSpecies} userId={userId}/>
     </div>
   );
 }

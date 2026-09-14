@@ -13,14 +13,31 @@ type Species = Database["public"]["Tables"]["species"]["Row"];
 
 const KINGDOMS: Species["kingdom"][] = ["Animalia", "Plantae", "Fungi", "Protista", "Archaea", "Bacteria"];
 
+// Renders the right input element for a field based on its "type", instead of a chain of name === "x" checks
+function EditableField({ name, value, type }: { name: string; value: string | number; type: "select" | "textarea" | "input" }) {
+    if (type === "select") {
+        return (
+            <select id={name} name={name} defaultValue={value} className="block w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
+                {KINGDOMS.map((kingdom) => (
+                    <option key={kingdom} value={kingdom}>{kingdom}</option>
+                ))}
+            </select>
+        );
+    }
+    if (type === "textarea") {
+        return <Textarea id={name} name={name} defaultValue={value} rows={4} />;
+    }
+    return <Input id={name} name={name} defaultValue={value} />;
+}
+
 export default function SpeciesDetailsDialog({localSpecies, setLocalSpecies, userId}: {localSpecies: Species; setLocalSpecies: Dispatch<SetStateAction<Species>>;userId: string}){
 
     
     const fieldConfig = [
-    { label: "Common name", name: "common_name" as const, value: localSpecies.common_name },
-    { label: "Total population", name: "total_population" as const, value: localSpecies.total_population },
-    { label: "Kingdom", name: "kingdom" as const, value: localSpecies.kingdom },
-    { label: "Description", name: "description" as const, value: localSpecies.description}
+    { label: "Common name", name: "common_name" as const, value: localSpecies.common_name, type: "input" as const },
+    { label: "Total population", name: "total_population" as const, value: localSpecies.total_population, type: "input" as const },
+    { label: "Kingdom", name: "kingdom" as const, value: localSpecies.kingdom, type: "select" as const },
+    { label: "Description", name: "description" as const, value: localSpecies.description, type: "textarea" as const }
     ];
     const [editMode, setEditMode] = useState(false);
     const router = useRouter();
@@ -68,68 +85,41 @@ export default function SpeciesDetailsDialog({localSpecies, setLocalSpecies, use
     }
     };
 
-    return(
-
-    editMode ?
-
-    (
+    
+    return (
         <Dialog>
-    <DialogTrigger asChild>
-        <Button className="mt-3 w-full">Learn More</Button>
-    </DialogTrigger>
-    <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
-        <DialogHeader>
-        <DialogTitle>{localSpecies.scientific_name}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={(e) => void handleSubmit(e)}>
-            {fieldConfig.map(({ label, name, value }) => (
-            value !== null && (
-            <div key={name} className="mb-2">
-                <label htmlFor={name} className="text-sm font-medium">{label}</label>
-                {name === "kingdom" ? (
-                    // Dropdown for kingdom, so only selected values can be allowed
-                    <select id={name} name={name} defaultValue={value} className="block w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm">
-                        {KINGDOMS.map((kingdom) => (
-                            <option key={kingdom} value={kingdom}>{kingdom}</option>
+            <DialogTrigger asChild>
+                <Button className="mt-3 w-full">Learn More</Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
+                <DialogHeader>
+                    <DialogTitle>{localSpecies.scientific_name}</DialogTitle>
+                </DialogHeader>
+                {/*conditional rendering based on if the user is editing the species*/}
+                {editMode ? (
+                    <form onSubmit={(e) => void handleSubmit(e)}>
+                        {fieldConfig.map(({ label, name, value, type }) => (
+                            value !== null && (
+                                <div key={name} className="mb-2">
+                                    <label htmlFor={name} className="text-sm font-medium">{label}</label>
+                                    <EditableField name={name} value={value} type={type} />
+                                </div>
+                            )
                         ))}
-                    </select>
-                ) : name === "description" ? (
-                    // Textarea instead of Input so the description has room for multiple lines
-                    <Textarea id={name} name={name} defaultValue={value} rows={4} />
+                        <div className="flex justify-between">
+                            <Button type="submit">Save</Button>
+                            <Button type="button" onClick={() => setEditMode(false)}>Cancel</Button>
+                        </div>
+                    </form>
                 ) : (
-                    <Input id={name} name={name} defaultValue={value} />
+                    <>
+                        {fieldConfig.map(({ label, value }) => (
+                            value !== null && <p key={label}>{label}: {value}</p>
+                        ))}
+                        {(userId === localSpecies.author) && <Button onClick={() => setEditMode(true)}>Edit The Specie</Button>}
+                    </>
                 )}
-            </div>
-            )
-            ))}
-            <div className="flex justify-between">
-                <Button type="submit">Save</Button>
-                <Button type="button" onClick={() => setEditMode(false)}>Cancel</Button>
-            </div>
-        </form>
-    </DialogContent>
-    </Dialog>
-    )
-
-
-    :
-        (
-        <Dialog>
-        {/* asChild here too - DialogTrigger renders its own <button>, and wrapping <Button> without asChild nests two buttons (invalid HTML, breaks hydration) */}
-        <DialogTrigger asChild>
-            <Button className="mt-3 w-full">Learn More</Button>
-        </DialogTrigger>
-        <DialogContent className="max-h-screen overflow-y-auto sm:max-w-[600px]">
-            <DialogHeader>
-            <DialogTitle>{localSpecies.scientific_name}</DialogTitle>
-                {fieldConfig.map(({label, value}) => (
-                    value !== null && <p key={label}>{label}: {value}</p>
-                ))}
-            </DialogHeader>
-            {(userId === localSpecies.author) && <Button onClick={() => setEditMode(true)}>Edit The Specie</Button>}
-        </DialogContent>
-    </Dialog>
-    )
-    )
-
+            </DialogContent>
+        </Dialog>
+    );
 }

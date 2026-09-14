@@ -1,13 +1,16 @@
 /* eslint-disable */
 "use client";
 import { TypographyH2, TypographyP } from "@/components/ui/typography";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 export default function SpeciesChatbot() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
   const [message, setMessage] = useState("");
   const [chatLog, setChatLog] = useState<{ role: "user" | "bot"; content: string }[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
   const handleInput = () => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -16,11 +19,59 @@ export default function SpeciesChatbot() {
     }
   };
 
-const handleSubmit = async () => {
-  // TODO: Implement this function
-}
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatLog, isLoading]);
 
-return (
+  const handleSubmit = async () => {
+    const trimmed = message.trim();
+
+
+    if (!trimmed || isLoading) return;
+
+    setChatLog((prev) => [...prev, { role: "user", content: trimmed }]);
+    setMessage("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed }),
+      });
+
+      const data = (await res.json()) as { response?: string; error?: string };
+
+      if (!res.ok) {
+        setChatLog((prev) => [
+          ...prev,
+          { role: "bot", content: data.error ?? "Something went wrong. Please try again." },
+        ]);
+        return;
+      }
+
+      setChatLog((prev) => [...prev, { role: "bot", content: data.response ?? "No response received." }]);
+    } catch {
+      
+      setChatLog((prev) => [
+        ...prev,
+        { role: "bot", content: "Could not reach the server. Check your connection and try again." },
+      ]);
+    } finally {
+    
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSubmit();
+    }
+  };
+
+  return (
     <>
       <TypographyH2>Species Chatbot</TypographyH2>
       <div className="mt-4 flex gap-4">
@@ -47,17 +98,19 @@ return (
             chatLog.map((msg, index) => (
               <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[75%] whitespace-pre-wrap rounded-2xl p-3 text-sm ${
+                  className={`max-w-[75%] rounded-2xl p-3 text-sm ${
                     msg.role === "user"
-                      ? "rounded-br-none bg-primary text-primary-foreground"
-                      : "rounded-bl-none border border-border bg-foreground text-primary-foreground"
+                      ? "whitespace-pre-wrap rounded-br-none bg-primary text-primary-foreground"
+                      : "rounded-bl-none border border-border bg-foreground text-primary-foreground [&_li]:ml-4 [&_ol]:my-2 [&_ol]:list-decimal [&_p]:my-2 [&_ul]:my-2 [&_ul]:list-disc"
                   }`}
                 >
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  {msg.role === "user" ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
                 </div>
               </div>
             ))
           )}
+          {isLoading && <p className="text-sm text-muted-foreground">Thinking…</p>}
+          <div ref={bottomRef} />
         </div>
         {/* Textarea and submission */}
         <div className="mt-4 flex flex-col items-end">
@@ -66,6 +119,8 @@ return (
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onInput={handleInput}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
             rows={1}
             placeholder="Ask about a species..."
             className="w-full resize-none overflow-hidden rounded border border-border bg-background p-2 text-sm text-foreground focus:outline-none"
@@ -73,9 +128,10 @@ return (
           <button
             type="button"
             onClick={() => void handleSubmit()}
-            className="mt-2 rounded bg-primary px-4 py-2 text-background transition hover:opacity-90"
+            disabled={isLoading || !message.trim()}
+            className="mt-2 rounded bg-primary px-4 py-2 text-background transition hover:opacity-90 disabled:opacity-50"
           >
-            Enter
+            {isLoading ? "Sending…" : "Enter"}
           </button>
         </div>
       </div>
